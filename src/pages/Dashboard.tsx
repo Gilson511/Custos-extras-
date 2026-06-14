@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import type { CustoExtra } from '../types'
 import { contarPorStatus, totalValorServico, formatarMoeda, getPrioridades, parseMoeda, normalizarData } from '../utils/calculos'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, AreaChart, Area } from 'recharts'
-import { Search } from 'lucide-react'
+import { Search, Package, Clock, Users, Truck, CheckCircle, XCircle, TrendingUp, Award, Wrench, AlertTriangle, Timer } from 'lucide-react'
 
 type DashboardProps = { dados: CustoExtra[] }
 
@@ -33,19 +33,24 @@ const CORES_STATUS: Record<string, string> = {
 
 const tdS: React.CSSProperties = { padding: '10px 12px', color: '#475569', whiteSpace: 'nowrap' }
 
-type KpiCardProps = { label: string; valor: string; bg: string; destaque?: boolean }
-function KpiCard({ label, valor, bg, destaque }: KpiCardProps) {
+type KpiCardProps = { label: string; valor: string; bg: string; destaque?: boolean; icon: React.ReactNode }
+function KpiCard({ label, valor, bg, destaque, icon }: KpiCardProps) {
   return (
-    <div style={{ background: bg, borderRadius: 12, padding: '16px 18px', boxShadow: destaque ? '0 0 0 3px #fcd34d' : 'none', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ background: bg, borderRadius: 12, padding: '14px 18px', boxShadow: destaque ? '0 0 0 3px #fcd34d' : 'none', position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 14 }}>
       <div style={{ position: 'absolute', right: -8, top: -8, width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,255,255,0.1)' }} />
-      <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 8, fontWeight: 600, letterSpacing: '0.5px' }}>{label.toUpperCase()}</p>
-      <p style={{ fontSize: 28, fontWeight: 800, color: '#fff' }}>{valor}</p>
+      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        {icon}
+      </div>
+      <div>
+        <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.75)', marginBottom: 4, fontWeight: 600, letterSpacing: '0.5px' }}>{label.toUpperCase()}</p>
+        <p style={{ fontSize: 26, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{valor}</p>
+      </div>
     </div>
   )
 }
 
 function Dashboard({ dados }: DashboardProps) {
-  const [filtroTransp, setFiltroTransp]   = useState('todos')
+  const [filtroTransp, setFiltroTransp]   = useState('todos') //Rendererização dos componentes. 
   const [filtroServico, setFiltroServico] = useState('todos')
   const [filtroOfensor, setFiltroOfensor] = useState('todos')
   const [filtroStatus, setFiltroStatus]   = useState('todos')
@@ -101,15 +106,13 @@ function Dashboard({ dados }: DashboardProps) {
       .slice(0, 15)
   }, [dadosFiltrados])
 
-  // Tendência mensal — últimos 12 meses
   const porMesDash = useMemo(() => {
     const map: Record<string, { mes: string, total: number }> = {}
     dadosFiltrados.forEach(r => {
       const data = normalizarData(r.dataInsercao)
       if (!data || data.length < 10) return
       const partes = data.split('/')
-      const m = partes[1]
-      const y = partes[2]
+      const m = partes[1]; const y = partes[2]
       if (!m || !y) return
       const chave = `${y}-${m}`
       if (!map[chave]) map[chave] = { mes: `${m}/${y.slice(2)}`, total: 0 }
@@ -121,7 +124,6 @@ function Dashboard({ dados }: DashboardProps) {
       .map(([, v]) => ({ ...v, total: Math.round(v.total) }))
   }, [dadosFiltrados])
 
-  // Tabela colateral — aparece só quando filtra por status
   const tabelaColateral = useMemo(() => {
     if (filtroStatus === 'todos') return []
     const map: Record<string, number> = {}
@@ -132,6 +134,57 @@ function Dashboard({ dados }: DashboardProps) {
       .map(([nome, valor]) => ({ nome, valor }))
       .sort((a, b) => b.valor - a.valor)
   }, [dadosFiltrados, filtroStatus])
+
+  // ── Cards informativos ──────────────────────────────────────────
+  const ticketMedio = useMemo(() => {
+    const vals = dadosFiltrados.map(r => parseMoeda(r.valorServico)).filter(v => v > 0)
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0
+  }, [dadosFiltrados])
+
+  const maiorExposto = useMemo(() => {
+    const map: Record<string, number> = {}
+    dadosFiltrados.forEach(r => {
+      map[r.transportadora] = (map[r.transportadora] || 0) + parseMoeda(r.valorServico)
+    })
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1])
+    return entries.length > 0 ? { nome: entries[0][0], valor: entries[0][1] } : null
+  }, [dadosFiltrados])
+
+  const servicoMaisUsado = useMemo(() => {
+    const map: Record<string, number> = {}
+    dadosFiltrados.forEach(r => { if (r.descricaoServico) map[r.descricaoServico] = (map[r.descricaoServico] || 0) + 1 })
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1])
+    if (entries.length === 0) return null
+    const total = dadosFiltrados.filter(r => r.descricaoServico).length
+    return { nome: entries[0][0], pct: ((entries[0][1] / total) * 100).toFixed(1) }
+  }, [dadosFiltrados])
+
+  const ofensorMaisFrequente = useMemo(() => {
+    const map: Record<string, number> = {}
+    dadosFiltrados.forEach(r => { if (r.ofensor) map[r.ofensor] = (map[r.ofensor] || 0) + 1 })
+    const entries = Object.entries(map).sort((a, b) => b[1] - a[1])
+    if (entries.length === 0) return null
+    const total = dadosFiltrados.filter(r => r.ofensor).length
+    return { nome: entries[0][0], pct: ((entries[0][1] / total) * 100).toFixed(1) }
+  }, [dadosFiltrados])
+
+  const tempoMedioAnalise = useMemo(() => {
+    const tempos: number[] = []
+    dadosFiltrados.forEach(r => {
+      if (!r.dataInsercao || !r.dataRetorno) return
+      const toDate = (s: string) => {
+        const p = normalizarData(s).split('/')
+        if (p.length < 3) return null
+        return new Date(`${p[2]}-${p[1]}-${p[0]}`)
+      }
+      const d1 = toDate(r.dataInsercao)
+      const d2 = toDate(r.dataRetorno)
+      if (!d1 || !d2) return
+      const dias = (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24)
+      if (dias >= 0 && dias < 365) tempos.push(dias)
+    })
+    return tempos.length > 0 ? (tempos.reduce((a, b) => a + b, 0) / tempos.length).toFixed(1) : '—'
+  }, [dadosFiltrados])
 
   const temFiltro = filtroTransp !== 'todos' || filtroServico !== 'todos' ||
     filtroOfensor !== 'todos' || filtroStatus !== 'todos' || busca !== ''
@@ -180,12 +233,12 @@ function Dashboard({ dados }: DashboardProps) {
 
       {/* KPI CARDS */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 10 }}>
-        <KpiCard label="Total registros"      valor={dadosFiltrados.length.toLocaleString('pt-BR')} bg={T.primaryDark} />
-        <KpiCard label="Pendente análise"     valor={contadores.pendente.toLocaleString('pt-BR')}   bg={T.warning} destaque />
-        <KpiCard label="Pend. customer"       valor={contadores.pendenteCustomer.toLocaleString('pt-BR')} bg={T.info} />
-        <KpiCard label="Pend. transportadora" valor={contadores.pendenteTransportadora.toLocaleString('pt-BR')} bg={T.purple} />
-        <KpiCard label="Autorizados"          valor={contadores.autorizado.toLocaleString('pt-BR')} bg={T.success} />
-        <KpiCard label="Não autorizados"      valor={contadores.naoAutorizado.toLocaleString('pt-BR')} bg={T.danger} />
+        <KpiCard label="Total registros"      valor={dadosFiltrados.length.toLocaleString('pt-BR')} bg={T.primaryDark} icon={<Package size={20} color="#fff" />} />
+        <KpiCard label="Pendente análise"     valor={contadores.pendente.toLocaleString('pt-BR')}   bg={T.warning} destaque icon={<Clock size={20} color="#fff" />} />
+        <KpiCard label="Pend. customer"       valor={contadores.pendenteCustomer.toLocaleString('pt-BR')} bg={T.info} icon={<Users size={20} color="#fff" />} />
+        <KpiCard label="Pend. transportadora" valor={contadores.pendenteTransportadora.toLocaleString('pt-BR')} bg={T.purple} icon={<Truck size={20} color="#fff" />} />
+        <KpiCard label="Autorizados"          valor={contadores.autorizado.toLocaleString('pt-BR')} bg={T.success} icon={<CheckCircle size={20} color="#fff" />} />
+        <KpiCard label="Não autorizados"      valor={contadores.naoAutorizado.toLocaleString('pt-BR')} bg={T.danger} icon={<XCircle size={20} color="#fff" />} />
       </div>
 
       {/* VALOR EXPOSTO */}
@@ -200,7 +253,7 @@ function Dashboard({ dados }: DashboardProps) {
         </div>
       </div>
 
-      {/* GRÁFICOS — barras + pizza */}
+      {/* GRÁFICOS */}
       <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 10 }}>
         <div style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.border}` }}>
           <p style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>Valor exposto por transportadora (R$) — Top 15</p>
@@ -217,7 +270,6 @@ function Dashboard({ dados }: DashboardProps) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-
         <div style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.border}` }}>
           <p style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>Distribuição por status</p>
           <ResponsiveContainer width="100%" height={220}>
@@ -234,7 +286,7 @@ function Dashboard({ dados }: DashboardProps) {
         </div>
       </div>
 
-      {/* GRÁFICO DE ÁREA — tendência mensal */}
+      {/* GRÁFICO DE ÁREA */}
       <div style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.border}` }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>Tendência de custos — últimos 12 meses</p>
         <ResponsiveContainer width="100%" height={180}>
@@ -254,7 +306,65 @@ function Dashboard({ dados }: DashboardProps) {
         </ResponsiveContainer>
       </div>
 
-      {/* TABELA COLATERAL — aparece só quando filtra por status */}
+      {/* CARDS INFORMATIVOS */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10 }}>
+        <div style={{ background: T.card, borderRadius: 12, padding: '14px 16px', border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#e0e7ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={16} color={T.primaryDark} />
+            </div>
+            <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>TICKET MÉDIO</span>
+          </div>
+          <p style={{ fontSize: 16, fontWeight: 800, color: T.primaryDark }}>{formatarMoeda(ticketMedio)}</p>
+        </div>
+
+        <div style={{ background: T.card, borderRadius: 12, padding: '14px 16px', border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Award size={16} color={T.danger} />
+            </div>
+            <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>MAIOR EXPOSTO</span>
+          </div>
+          <p style={{ fontSize: 12, fontWeight: 700, color: T.primaryDark, marginBottom: 2 }}>{maiorExposto?.nome || '—'}</p>
+          <p style={{ fontSize: 11, color: T.textMuted }}>{maiorExposto ? formatarMoeda(maiorExposto.valor) : ''}</p>
+        </div>
+
+        <div style={{ background: T.card, borderRadius: 12, padding: '14px 16px', border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#dcfce7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Wrench size={16} color={T.success} />
+            </div>
+            <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>SERVIÇO MAIS USADO</span>
+          </div>
+          <p style={{ fontSize: 12, fontWeight: 700, color: T.primaryDark, marginBottom: 2 }}>{servicoMaisUsado?.nome || '—'}</p>
+          <p style={{ fontSize: 11, color: T.textMuted }}>{servicoMaisUsado ? `${servicoMaisUsado.pct}% do total` : ''}</p>
+        </div>
+
+        <div style={{ background: T.card, borderRadius: 12, padding: '14px 16px', border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertTriangle size={16} color={T.warning} />
+            </div>
+            <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>OFENSOR FREQUENTE</span>
+          </div>
+          <p style={{ fontSize: 12, fontWeight: 700, color: T.primaryDark, marginBottom: 2 }}>{ofensorMaisFrequente?.nome || '—'}</p>
+          <p style={{ fontSize: 11, color: T.textMuted }}>{ofensorMaisFrequente ? `${ofensorMaisFrequente.pct}% dos casos` : ''}</p>
+        </div>
+
+        <div style={{ background: T.card, borderRadius: 12, padding: '14px 16px', border: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f3e8ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Timer size={16} color={T.purple} />
+            </div>
+            <span style={{ fontSize: 10, color: T.textMuted, fontWeight: 600 }}>TEMPO MÉDIO ANÁLISE</span>
+          </div>
+          <p style={{ fontSize: 16, fontWeight: 800, color: T.primaryDark }}>
+            {tempoMedioAnalise} <span style={{ fontSize: 12, fontWeight: 400, color: T.textMuted }}>dias</span>
+          </p>
+        </div>
+      </div>
+
+      {/* TABELA COLATERAL */}
       {tabelaColateral.length > 0 && (
         <div style={{ background: T.card, borderRadius: 12, padding: '16px 18px', border: `1px solid ${T.border}` }}>
           <p style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 14 }}>
