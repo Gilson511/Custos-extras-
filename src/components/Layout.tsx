@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LayoutDashboard, Truck, FileText, Settings, LogOut, ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Truck, FileText, LogOut, ChevronLeft, ChevronRight, Sun, Moon } from 'lucide-react'
 
 type LayoutProps = {
   children: React.ReactNode
@@ -19,7 +19,7 @@ function Layout({ children, nomeUsuario, onLogout, paginaAtiva, onMudarPagina }:
     { id: 'dashboard',       label: 'Dashboard',       icon: <LayoutDashboard size={18} /> },
     { id: 'transportadoras', label: 'Transportadoras', icon: <Truck size={18} /> },
     { id: 'analises',        label: 'Análises',        icon: <FileText size={18} /> },
-    { id: 'configuracoes',   label: 'Configurações',   icon: <Settings size={18} /> },
+     //Menu sconfigurações em breve  sera lançado.
   ]
 
   const larguraSidebar = collapsed ? 64 : 220

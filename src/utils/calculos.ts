@@ -2,13 +2,39 @@ import type { CustoExtra } from '../types'
 
 export function parseMoeda(valor: string): number {
   if (!valor || typeof valor !== 'string') return 0
-  // Remove tudo que não é número, vírgula ou ponto
-  const limpo = valor
-    .replace(/[R$\s]/g, '')
-    .replace(/\./g, '')
-    .replace(',', '.')
-    .trim()
-  const num = parseFloat(limpo)
+
+  const limpo = valor.replace(/[R$\s]/g, '').trim()
+  if (!limpo) return 0
+
+  // Detecta o formato automaticamente
+  const temVirgula = limpo.includes(',')
+  const temPonto   = limpo.includes('.')
+
+  let normalizado: string
+
+  if (temVirgula && temPonto) {
+    // Formato BR: 1.234,56 → remove ponto, troca vírgula por ponto
+    normalizado = limpo.replace(/\./g, '').replace(',', '.')
+  } else if (temVirgula && !temPonto) {
+    // Só vírgula: 1234,56 → troca por ponto
+    normalizado = limpo.replace(',', '.')
+  } else if (temPonto && !temVirgula) {
+    // Só ponto: pode ser 903.23 (decimal) ou 1.234 (milhar)
+    const partes = limpo.split('.')
+    const ultimaParte = partes[partes.length - 1]
+    if (ultimaParte.length <= 2) {
+      // Ex: 903.23 — ponto é decimal, não mexe
+      normalizado = limpo
+    } else {
+      // Ex: 1.234 — ponto é milhar, remove
+      normalizado = limpo.replace(/\./g, '')
+    }
+  } else {
+    // Sem separador: número inteiro
+    normalizado = limpo
+  }
+
+  const num = parseFloat(normalizado)
   return isNaN(num) ? 0 : num
 }
 
